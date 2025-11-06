@@ -15,17 +15,36 @@ metadata:
 
 projects:
   - name: my-python-project
-    source:
-      type: git
-      location: 'https://github.com/KarahAllen/EclipseCheTest.git' # Replace with your project's URL
+    git:
+      remotes:
+        origin: https://github.com/KarahAllen/EclipseCheTest.git
 
 components:
-  - name: python-image
-    image:  https://registry.devfile.io/viewer/devfiles/community/python #quay.io/devfile/universal-developer-image:ubi9-latest
-    dockerfile:
+  - name: py
+    container:
+      image: registry.access.redhat.com/ubi9/python-39:1-1743091356
+      args: ['tail', '-f', '/dev/null']
+      mountSources: true
+      dockerfile:
         args:
           - --build-arg=PROJECT_NAME=my-python-project
         uri: https://github.com/KarahAllen/EclipseCheTest/blob/main/Dockerfile
+      endpoints:
+        - name: https-python
+          targetPort: 8080
+          protocol: https
+        - exposure: none
+          name: debug
+          targetPort: 5858
+      env:
+        - name: DEBUG_PORT
+          value: '5858'
+ # - name: python-image
+  #  image:  https://registry.devfile.io/viewer/devfiles/community/python #quay.io/devfile/universal-developer-image:ubi9-latest
+  #  dockerfile:
+    #    args:
+     #     - --build-arg=PROJECT_NAME=my-python-project
+     #   uri: https://github.com/KarahAllen/EclipseCheTest/blob/main/Dockerfile
 
   - name: jupyter-notebook
     container:
@@ -33,46 +52,20 @@ components:
       args: ['jupyter', 'lab', '--ip=0.0.0.0', '--allow-root']
       
 commands:
-  - id: build-docker
+  - id: pip-install-requirements
     exec:
-      component: python-image
-      command: docker build .
+      commandLine: pip install -r requirements.txt
+      workingDir: ${PROJECT_SOURCE}
       group:
-        kind: run
+        kind: build
         isDefault: true
-  - id: createenv
+      component: py
+  - id: debug-py
     exec:
-      component: python-image
-      command: python -m virtualenv .venv && source .venv/bin/activate && .venv/bin/pip install -r requirements.txt
-      workingdir: ${PROJECT_SOURCE} # Adjust workdir if needed
+      commandLine: 'pip install debugpy && python -m debugpy --listen 0.0.0.0:${DEBUG_PORT} pythonChart.py'
+      workingDir: ${PROJECT_SOURCE}
+      component: py
       group:
-        kind: run
-        isDefault: true
-  - id: install-kernel
-    exec:
-      component: jupyter-notebook
-      commandLine: |
-        pip install ipykernel
-        python -m ipykernel install --user --name=my-kernel --display-name="My Custom Python Kernel"
+        kind: debug
 
-  - id: set-default-kernel
-    exec:
-      component: jupyter-notebook
-      commandLine: |
-        mkdir -p /home/user/.jupyter
-        echo "c.KernelManager.default_kernel_name = 'my-kernel'" > /home/user/.jupyter/jupyter_notebook_config.py
-      workingDir: /home/user
 
-  - id: setup-jupyter
-    composite:
-      commands:
-        - install-kernel
-        - set-default-kernel
-      group:
-        kind: run
-        isDefault: true
-events:
-  postStart:
-    - build-docker
-    - createenv
-    - setup-jupyter
