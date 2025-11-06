@@ -25,10 +25,6 @@ components:
       image: registry.access.redhat.com/ubi9/python-39:1-1743091356
       args: ['tail', '-f', '/dev/null']
       mountSources: true
-      dockerfile:
-        args:
-          - --build-arg=PROJECT_NAME=my-python-project
-        uri: https://github.com/KarahAllen/EclipseCheTest/blob/main/Dockerfile
       endpoints:
         - name: https-python
           targetPort: 8080
